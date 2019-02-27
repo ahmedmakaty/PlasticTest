@@ -3,6 +3,7 @@ package com.example.ahmedmakaty.base.injection;
 import android.app.Application;
 
 import com.example.ahmedmakaty.base.App;
+import com.example.ahmedmakaty.base.injection.module.AppModule;
 import com.example.ahmedmakaty.base.injection.module.FragmentBindingModule;
 import com.example.ahmedmakaty.base.injection.module.NetworkModule;
 import com.example.ahmedmakaty.base.injection.module.data.UserDataModule;
@@ -18,8 +19,11 @@ import dagger.android.support.AndroidSupportInjectionModule;
 @Component(modules = {NetworkModule.class,
         UserDataModule.class,
         AndroidSupportInjectionModule.class,
+        AppModule.class,
         FragmentBindingModule.class})
 public interface AppComponent {
+
+    void inject(App app);
 
     @Component.Builder
     interface Builder {
@@ -28,6 +32,4 @@ public interface AppComponent {
 
         AppComponent build();
     }
-
-    void inject(App app);
 }

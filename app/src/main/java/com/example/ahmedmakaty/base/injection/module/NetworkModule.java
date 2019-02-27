@@ -25,12 +25,6 @@ import retrofit2.converter.gson.GsonConverterFactory;
 @Module
 public class NetworkModule {
 
-    private static final String API_URL = "API_URL";
-
-    @Inject
-    @Named(API_URL)
-    String baseUrl;
-
     @Provides
     public HttpLoggingInterceptor providesHttpLoggingInterceptor() {
         return new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BODY);
@@ -56,11 +50,11 @@ public class NetworkModule {
 
     @Provides
     @Singleton
-    static Retrofit provideApi(@Named(API_URL) String baseUrl, Gson gson, OkHttpClient client) {
+    static Retrofit provideApi(Gson gson, OkHttpClient client) {
         return new Retrofit.Builder().addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .client(client)
-                .baseUrl(baseUrl)
+                .baseUrl("https://dateandtimeasjson.appspot.com/")
                 .build();
     }
 }

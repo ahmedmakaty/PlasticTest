@@ -36,18 +36,28 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.ahmedmakaty.base.R;
+import com.example.ahmedmakaty.base.data.model.DateResponse;
+import com.example.ahmedmakaty.base.data.remote.ApiServiceInterface;
 import com.example.ahmedmakaty.base.presentation.BaseFragment;
 import com.google.gson.Gson;
 
 import org.greenrobot.eventbus.EventBus;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Inject;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import dagger.android.support.AndroidSupportInjection;
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
 
 import static android.view.MotionEvent.INVALID_POINTER_ID;
 
@@ -69,8 +79,9 @@ public class MainFragment extends BaseFragment {
     int originalHeight;
     boolean collapsed = false;
     boolean channelling = false;
-    private AlertDialog mProgress;
-    private ScaleGestureDetector mScaleDetector;
+    @Inject
+    ApiServiceInterface apiServiceInterface;
+    Disposable disposable;
     private int mActivePointerId = INVALID_POINTER_ID;
 
     public static MainFragment newInstance() {
@@ -90,13 +101,8 @@ public class MainFragment extends BaseFragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_main, container, false);
         ButterKnife.bind(this, view);
-        //initializeToolbar();
 
         initClickListeners();
-
-        //setupRecyclerView();
-
-        //mScaleDetector = new ScaleGestureDetector(getContext(), new ScaleListener());
 
         return view;
     }
@@ -111,37 +117,16 @@ public class MainFragment extends BaseFragment {
 
         rotateObjectForever();
 
-        //object.animate().rotation(360).setDuration(1000);
-
         defineObjectTouchListener();
 
         targetHeight = target.getHeight() * 3;
         originalHeight = target.getHeight();
 
-    }
+        disposable = Observable.fromCallable(() -> 1000)
+                .repeatWhen(o -> o.concatMap(v -> Observable.timer(10, TimeUnit.MILLISECONDS)))
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::getDateTime, this::onError);
 
-    private void rotateObjectForever() {
-        object.animate().rotation(object.getRotation() + 360).setDuration(1000).setInterpolator(new LinearInterpolator()).setListener(new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                rotateObjectForever();
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animation) {
-
-            }
-        });
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -150,7 +135,6 @@ public class MainFragment extends BaseFragment {
         object.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent ev) {
-                //mScaleDetector.onTouchEvent(ev);
                 if (originalHeight == 0) {
                     originalHeight = target.getHeight();
                     targetHeight = originalHeight * 3;
@@ -178,6 +162,7 @@ public class MainFragment extends BaseFragment {
 
                         object.clearAnimation();
 
+
                         // Find the index of the active pointer and fetch its position
                         final int pointerIndex =
                                 MotionEventCompat.findPointerIndex(ev, mActivePointerId);
@@ -189,8 +174,11 @@ public class MainFragment extends BaseFragment {
                         final float dx = x - mLastTouchX;
                         final float dy = y - mLastTouchY;
 
+                        object.setX(object.getX() + dx);
+                        object.setY(object.getY() + dy);
+                        object.requestLayout();
 
-                            object.animate().x(object.getX() + dx).y(object.getY() + dy).setDuration(0).setInterpolator(new AccelerateDecelerateInterpolator());
+                           // object.animate().x(object.getX() + dx).y(object.getY() + dy).setDuration(0).setInterpolator(new AccelerateDecelerateInterpolator());
 
                         object.animate().rotationBy(6).setDuration(0).setInterpolator(new LinearInterpolator());
                         Log.d("DETAILS", "X:" + object.getX() + " Y:" + object.getY() + " PivotX:" + object.getPivotX() + " PivotY:" + object.getPivotY() + " width:" + object.getWidth());
@@ -248,7 +236,7 @@ public class MainFragment extends BaseFragment {
 
     private void dropObject() {
         channelling = true;
-        object.animate().x((target.getX() + (target.getWidth() / 2)) - object.getWidth() / 2).y((target.getY() + (target.getHeight() / 2)) - object.getHeight() / 2).setDuration(200).setInterpolator(new AccelerateDecelerateInterpolator()).setListener(new Animator.AnimatorListener() {
+        object.animate().x((target.getX() + (target.getWidth() / 2)) - object.getWidth() / 2).y((target.getY() + (target.getHeight() / 2)) - object.getHeight() / 2).setDuration(100).setInterpolator(new LinearInterpolator()).setListener(new Animator.AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animation) {
 
@@ -276,28 +264,63 @@ public class MainFragment extends BaseFragment {
     }
 
     private void prepareBin() {
-//        ScaleAnimation animation = new ScaleAnimation(1.0f, 1.0f, 0.0f, -3.0f);
-//        animation.setDuration(200);
-//        animation.setInterpolator(new LinearInterpolator());
-//        animation.setAnimationListener(new Animation.AnimationListener() {
-//            @Override
-//            public void onAnimationStart(Animation animation) {
-//
-//            }
-//
-//            @Override
-//            public void onAnimationEnd(Animation animation) {
-//                target.setScaleY(5.0f);
-//            }
-//
-//            @Override
-//            public void onAnimationRepeat(Animation animation) {
-//
-//            }
-//        });
-//        target.startAnimation(animation);
-
         slideDrawer(300, target.getHeight(), targetHeight);
+    }
+
+    private void getDateTime(Integer integer) {
+        Observable<DateResponse> observable = apiServiceInterface.getDateTime();
+        observable.subscribeOn(Schedulers.newThread()).
+                observeOn(AndroidSchedulers.mainThread())
+                .map(result -> result.getDateTime())
+                .subscribe(this::handleResults, this::handleError);
+    }
+
+    private void handleResults(String s) {
+
+        Date date = new Date();
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ssss");
+        SimpleDateFormat df3 = new SimpleDateFormat("HH:mm:ss");
+        try {
+            date = format.parse(s);
+            Log.d("RESULT", df3.format(date));
+            object.setText(df3.format(date));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void onError(Throwable throwable) {
+        Toast.makeText(getContext(), "OnError in Observable Timer",
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void handleError(Throwable t) {
+
+        //Add your error here.
+    }
+
+    private void rotateObjectForever() {
+        object.animate().rotation(object.getRotation() + 360).setDuration(1000).setInterpolator(new LinearInterpolator()).setListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                rotateObjectForever();
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+
+            }
+        });
     }
 
     public void slideDrawer(long duration, int height, int heightAfter) {
@@ -340,36 +363,12 @@ public class MainFragment extends BaseFragment {
         Snackbar.make(getView(), s, Snackbar.LENGTH_LONG);
     }
 
-    public void initializeToolbar() {
-        ((AppCompatActivity) getActivity()).setSupportActionBar(toolbar);
-        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                onBackPressed();
-            }
-        });
-        ((AppCompatActivity) getActivity()).getSupportActionBar().setTitle(getResources().getString(R.string.main_title));
-        ((AppCompatActivity) getActivity()).getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        ((AppCompatActivity) getActivity()).getSupportActionBar().setHomeButtonEnabled(true);
-
-    }
-
     private void initClickListeners() {
 
 //        addNewCard.setOnClickListener((View v) -> {
 //            goToPayfortScreen();
 //        });
 
-    }
-
-    private void showProgress(Boolean show) {
-        if (mProgress != null) {
-            if (show) {
-                mProgress.show();
-            } else {
-                mProgress.dismiss();
-            }
-        }
     }
 
     private void onBackPressed() {
