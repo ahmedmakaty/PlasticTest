@@ -102,8 +102,6 @@ public class MainFragment extends BaseFragment {
         View view = inflater.inflate(R.layout.fragment_main, container, false);
         ButterKnife.bind(this, view);
 
-        initClickListeners();
-
         return view;
     }
 
@@ -122,6 +120,7 @@ public class MainFragment extends BaseFragment {
         targetHeight = target.getHeight() * 3;
         originalHeight = target.getHeight();
 
+        //Sitting the api call to be every 10 milliseconds (I tried 1 millisecond but the performance was not stable)
         disposable = Observable.fromCallable(() -> 1000)
                 .repeatWhen(o -> o.concatMap(v -> Observable.timer(10, TimeUnit.MILLISECONDS)))
                 .observeOn(AndroidSchedulers.mainThread())
@@ -129,6 +128,8 @@ public class MainFragment extends BaseFragment {
 
     }
 
+    //Handle square dragging, retrieving position of touch and saving it to calculate the distance the square should be moved
+    //checks if the square goes into the drawer by 25% and dropping it inside
     @SuppressLint("ClickableViewAccessibility")
     private void defineObjectTouchListener() {
 
@@ -182,6 +183,7 @@ public class MainFragment extends BaseFragment {
 
                         object.animate().rotationBy(6).setDuration(0).setInterpolator(new LinearInterpolator());
                         Log.d("DETAILS", "X:" + object.getX() + " Y:" + object.getY() + " PivotX:" + object.getPivotX() + " PivotY:" + object.getPivotY() + " width:" + object.getWidth());
+
                         // Remember this touch position for the next move event
                         mLastTouchX = x;
                         mLastTouchY = y;
@@ -234,6 +236,7 @@ public class MainFragment extends BaseFragment {
         });
     }
 
+    //translation animation to move the object from it's current location to the center of the drawer
     private void dropObject() {
         channelling = true;
         object.animate().x((target.getX() + (target.getWidth() / 2)) - object.getWidth() / 2).y((target.getY() + (target.getHeight() / 2)) - object.getHeight() / 2).setDuration(100).setInterpolator(new LinearInterpolator()).setListener(new Animator.AnimatorListener() {
@@ -259,14 +262,17 @@ public class MainFragment extends BaseFragment {
         });
     }
 
+    //animating the drawer close
     private void restoreNormalBin() {
         slideDrawer(300, target.getHeight(), originalHeight);
     }
 
+    //animating the drawer open
     private void prepareBin() {
         slideDrawer(300, target.getHeight(), targetHeight);
     }
 
+    //the api call to get the time and handling result and error
     private void getDateTime(Integer integer) {
         Observable<DateResponse> observable = apiServiceInterface.getDateTime();
         observable.subscribeOn(Schedulers.newThread()).
@@ -275,6 +281,7 @@ public class MainFragment extends BaseFragment {
                 .subscribe(this::handleResults, this::handleError);
     }
 
+    //parsing the result date and printing the time on the square
     private void handleResults(String s) {
 
         Date date = new Date();
@@ -299,6 +306,8 @@ public class MainFragment extends BaseFragment {
         //Add your error here.
     }
 
+    //Not the perfect way for handling the infinite rotation, needed a work around when the user is dragging the object
+    //I would have implemented a custom view which rotates all the time given it's x and y position on the screen and renewing the pivot and starting the animation from the last animated angle and so on
     private void rotateObjectForever() {
         object.animate().rotation(object.getRotation() + 360).setDuration(1000).setInterpolator(new LinearInterpolator()).setListener(new Animator.AnimatorListener() {
             @Override
@@ -323,6 +332,7 @@ public class MainFragment extends BaseFragment {
         });
     }
 
+    //handles drawer animation
     public void slideDrawer(long duration, int height, int heightAfter) {
         ValueAnimator slideAnimator = ValueAnimator
                 .ofInt(height, heightAfter)
@@ -355,19 +365,24 @@ public class MainFragment extends BaseFragment {
         set.start();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        if(disposable.isDisposed()){
+            disposable = Observable.fromCallable(() -> 1000)
+                    .repeatWhen(o -> o.concatMap(v -> Observable.timer(10, TimeUnit.MILLISECONDS)))
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(this::getDateTime, this::onError);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        disposable.dispose();
+    }
+
     private void initiateLiveObservers() {
-
-    }
-
-    private void showErrorMessage(String s) {
-        Snackbar.make(getView(), s, Snackbar.LENGTH_LONG);
-    }
-
-    private void initClickListeners() {
-
-//        addNewCard.setOnClickListener((View v) -> {
-//            goToPayfortScreen();
-//        });
 
     }
 
